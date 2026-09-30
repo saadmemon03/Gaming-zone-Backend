@@ -13,7 +13,7 @@ import dashboardRoutes from "./routes/dashboard.routes.js";
 const app = express();
 
 app.use(cors({ 
-  origin: ["http://localhost:5173", "https://gaming-zone-backend-production-6568.up.railway.app/api/health", "http://127.0.0.1:5173", process.env.CLIENT_URL], 
+  origin: ["http://localhost:5173", "https://gaming-zone-backend-production-6568.up.railway.app", "http://127.0.0.1:5173", process.env.CLIENT_URL], 
   credentials: true 
 }));
 
