@@ -1,6 +1,9 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
+import morgan from "morgan";
+import rateLimit from "express-rate-limit";
 import connectDB from "./db/connect.js";
 
 import authRoutes      from "./routes/auth.routes.js";
@@ -11,6 +14,19 @@ import bookingsRoutes  from "./routes/bookings.routes.js";
 import dashboardRoutes from "./routes/dashboard.routes.js";
 
 const app = express();
+
+// Security Middlewares
+app.use(helmet());
+app.use(morgan("dev"));
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 200, // Limit each IP to 200 requests per `window`
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use("/api", limiter);
 
 app.use(
   cors({

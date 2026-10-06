@@ -1,123 +1,138 @@
-import jwt from "jsonwebtoken";
-import User from "../models/User.model.js";
-import crypto from "crypto";
-import sendEmail from "../utils/sendEmail.js";
+import { z } from "zod";
+import * as authService from "../services/auth.service.js";
+import { strongPasswordMessage, strongPasswordPattern } from "../utils/passwordValidation.js";
 
-const genToken = (user) =>
-  jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: "24h" });
+const registerSchema = z.object({
+  name: z.string().min(1, "name, email and password are required"),
+  email: z.string().email("Invalid email").min(1, "name, email and password are required"),
+  password: z.string().regex(strongPasswordPattern, strongPasswordMessage),
+  phone: z.string().optional(),
+});
 
-// POST /api/auth/register
 export const register = async (req, res) => {
   try {
-    const { name, email, password, phone } = req.body;
-    if (!name || !email || !password)
-      return res.status(400).json({ success: false, message: "name, email, password required" });
-
-    const exists = await User.findOne({ email });
-    if (exists)
-      return res.status(409).json({ success: false, message: "Email already in use" });
-
-    const user = await User.create({ name, email, password, phone });
-    res.status(201).json({ success: true, message: "Registered successfully", token: genToken(user), user });
+    const validatedData = registerSchema.parse(req.body);
+    const result = await authService.registerService(validatedData);
+    return res.status(200).json({ success: true, ...result });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({
+        success: false,
+        message: err.issues.map((issue) => issue.message).join(", "),
+      });
+    }
+    const status = err.status || 500;
+    return res.status(status).json({ success: false, message: err.message });
   }
 };
 
-// POST /api/auth/login
+const verifyEmailSchema = z.object({
+  email: z.string().min(1, "Email and OTP are required"),
+  otp: z.union([z.string(), z.number()]).transform((val) => String(val)),
+});
+
+export const verifyEmail = async (req, res) => {
+  try {
+    const validatedData = verifyEmailSchema.parse(req.body);
+    const result = await authService.verifyEmailService(validatedData);
+    return res.status(200).json({ success: true, ...result });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ success: false, message: "Email and OTP are required" });
+    }
+    const status = err.status || 500;
+    return res.status(status).json({ success: false, message: err.message });
+  }
+};
+
+const resendVerificationOtpSchema = z.object({
+  email: z.string().trim().email("Enter a valid email address."),
+});
+
+export const resendVerificationOtp = async (req, res) => {
+  try {
+    const validatedData = resendVerificationOtpSchema.parse(req.body);
+    const result = await authService.resendVerificationOtpService(validatedData);
+    return res.status(200).json({ success: true, ...result });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({
+        success: false,
+        message: err.issues.map((issue) => issue.message).join(", "),
+      });
+    }
+    const status = err.status || 500;
+    return res.status(status).json({ success: false, message: err.message });
+  }
+};
+
+const loginSchema = z.object({
+  email: z.string().min(1, "Email and password are required"),
+  password: z.string().min(1, "Email and password are required"),
+});
+
 export const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
-    if (!email || !password)
-      return res.status(400).json({ success: false, message: "Email and password required" });
-
-    const user = await User.findOne({ email, isActive: true }).select("+password");
-    if (!user || !(await user.matchPassword(password)))
-      return res.status(401).json({ success: false, message: "Invalid credentials" });
-
-    res.json({ success: true, message: "Login successful", token: genToken(user), user });
+    const validatedData = loginSchema.parse(req.body);
+    const result = await authService.loginService(validatedData);
+    return res.status(200).json({ success: true, ...result });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ success: false, message: "Email and password are required" });
+    }
+    const status = err.status || 500;
+    const response = { success: false, message: err.message };
+    if (err.code) response.code = err.code;
+    return res.status(status).json(response);
   }
 };
 
-// GET /api/auth/me
 export const getMe = async (req, res) => {
-  res.json({ success: true, user: req.user });
+  try {
+    const result = await authService.getMeService(req.user);
+    return res.status(200).json({ success: true, ...result });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
 };
 
-// POST /api/auth/forgot-password
+const forgotPasswordSchema = z.object({
+  email: z.string().email("Invalid email"),
+});
+
 export const forgotPassword = async (req, res) => {
   try {
-    const user = await User.findOne({ email: req.body.email });
-    if (!user) {
-      return res.status(404).json({ success: false, message: "Is email se koi user nahi mila" });
-    }
-
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    
-    user.resetPasswordToken = crypto.createHash("sha256").update(otp).digest("hex");
-    user.resetPasswordExpire = Date.now() + 10 * 60 * 1000; 
-    
-    await user.save({ validateBeforeSave: false });
-
-    const htmlMessage = `
-      <h3>Password Reset Request</h3>
-      <p>Aapka password reset OTP ye hai: <strong>${otp}</strong></p>
-      <p>Ye OTP 10 minutes mein expire ho jayega.</p>
-    `;
-
-    try {
-      await sendEmail({
-        email: user.email,
-        subject: "Password Reset OTP - GameZone",
-        html: htmlMessage,
-      });
-      res.status(200).json({ success: true, message: "OTP aapki email par bhej diya gaya hai" });
-    } catch (err) {
-      user.resetPasswordToken = undefined;
-      user.resetPasswordExpire = undefined;
-      await user.save({ validateBeforeSave: false });
-      console.error("Forgot-password email failed:", err.message);
-      const message = err.message.includes("SMTP_EMAIL")
-        ? "SMTP_EMAIL aur SMTP_PASSWORD ko gaming-api/.env mein configure karein"
-        : "Email bhejne mein masla aaya";
-      return res.status(500).json({ success: false, message });
-    }
+    const validatedData = forgotPasswordSchema.parse(req.body);
+    const result = await authService.forgotPasswordService(validatedData);
+    return res.status(200).json({ success: true, ...result });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ success: false, message: err.errors.map((e) => e.message).join(", ") });
+    }
+    const status = err.status || 500;
+    return res.status(status).json({ success: false, message: err.message });
   }
 };
 
-// POST /api/auth/reset-password
+const resetPasswordSchema = z.object({
+  email: z.string().min(1, "Email, OTP aur Naya Password zaroori hain"),
+  otp: z.union([z.string(), z.number()]).transform((val) => String(val)),
+  newPassword: z.string().regex(strongPasswordPattern, strongPasswordMessage),
+});
+
 export const resetPassword = async (req, res) => {
   try {
-    const { email, otp, newPassword } = req.body;
-    
-    if (!email || !otp || !newPassword) {
-      return res.status(400).json({ success: false, message: "Email, OTP aur Naya Password zaroori hain" });
-    }
-    
-    const hashedOTP = crypto.createHash("sha256").update(otp).digest("hex");
-
-    const user = await User.findOne({
-      email: email,
-      resetPasswordToken: hashedOTP,
-      resetPasswordExpire: { $gt: Date.now() },
-    });
-
-    if (!user) {
-      return res.status(400).json({ success: false, message: "Ghalat ya Expire shuda OTP" });
-    }
-
-    user.password = newPassword;
-    user.resetPasswordToken = undefined;
-    user.resetPasswordExpire = undefined;
-    
-    await user.save();
-
-    res.status(200).json({ success: true, message: "Password kamyabi se reset ho gaya. Ab aap login kar sakte hain." });
+    const validatedData = resetPasswordSchema.parse(req.body);
+    const result = await authService.resetPasswordService(validatedData);
+    return res.status(200).json({ success: true, ...result });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({
+        success: false,
+        message: err.issues.map((issue) => issue.message).join(", "),
+      });
+    }
+    const status = err.status || 500;
+    return res.status(status).json({ success: false, message: err.message });
   }
 };

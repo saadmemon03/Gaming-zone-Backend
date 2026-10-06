@@ -1,9 +1,12 @@
-﻿import Booking from "../models/Booking.model.js";
+import Booking from "../models/Booking.model.js";
 import Station from "../models/Station.model.js";
+import { validateBookingTimes } from "../utils/bookingValidation.js";
 
 export const getBookings = async (req, res) => {
   try {
-    const bookings = await Booking.find().populate("user").populate("station").sort({ createdAt: -1 });
+    const shouldOnlyReturnOwnBookings = req.user.role === "user" || req.query.my === "true";
+    const query = shouldOnlyReturnOwnBookings ? { user: req.user._id } : {};
+    const bookings = await Booking.find(query).populate("user").populate("station").sort({ createdAt: -1 });
     res.json({ success: true, data: bookings });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 };
@@ -17,8 +20,44 @@ export const getBookingById = async (req, res) => {
 
 export const createBooking = async (req, res) => {
   try {
-    const booking = await Booking.create(req.body);
-    await Station.findByIdAndUpdate(req.body.station, { status: "Occupied" });
+    const { station, startTime, endTime } = req.body;
+    const contactNumber = typeof req.body.contactNumber === "string" ? req.body.contactNumber.trim() : "";
+    if (req.user.role === "user" && !contactNumber) {
+      return res.status(400).json({ success: false, message: "Contact number is required to create a booking." });
+    }
+
+    const timeValidationError = validateBookingTimes(startTime, endTime);
+    if (timeValidationError) {
+      return res.status(400).json({ success: false, message: timeValidationError });
+    }
+    
+    // Check for overlapping bookings
+    const overlap = await Booking.findOne({
+      station: station,
+      status: { $in: ["Pending", "Confirmed"] },
+      $or: [
+        { startTime: { $lt: endTime }, endTime: { $gt: startTime } }
+      ]
+    });
+    
+    if (overlap) {
+      return res.status(400).json({ success: false, message: "This slot is already booked for the selected time." });
+    }
+
+    const booking = await Booking.create({
+      ...req.body,
+      user: req.user._id,
+      contactNumber,
+      customerEmail: req.user.email
+    });
+    
+    // Optional: Only update station to occupied if booking is starting right now
+    const now = new Date();
+    const st = new Date(startTime);
+    if (st <= now && new Date(endTime) > now) {
+      await Station.findByIdAndUpdate(station, { status: "Occupied" });
+    }
+    
     res.status(201).json({ success: true, data: booking });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 };

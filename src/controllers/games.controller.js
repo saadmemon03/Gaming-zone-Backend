@@ -28,6 +28,10 @@ export const getGameById = async (req, res) => {
 
 export const createGame = async (req, res) => {
   try {
+    const existing = await Game.findOne({ name: { $regex: new RegExp(`^${req.body.name}$`, "i") } });
+    if (existing) {
+      return res.status(400).json({ success: false, message: "A game with this name already exists!" });
+    }
     const game = await Game.create(req.body);
     res.status(201).json({ success: true, data: game });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
@@ -35,6 +39,15 @@ export const createGame = async (req, res) => {
 
 export const updateGame = async (req, res) => {
   try {
+    if (req.body.name) {
+      const existing = await Game.findOne({ 
+        name: { $regex: new RegExp(`^${req.body.name}$`, "i") },
+        _id: { $ne: req.params.id }
+      });
+      if (existing) {
+        return res.status(400).json({ success: false, message: "A game with this name already exists!" });
+      }
+    }
     const game = await Game.findByIdAndUpdate(req.params.id, req.body, { new: true });
     res.json({ success: true, data: game });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
