@@ -47,3 +47,37 @@ export const deleteUser = async (req, res) => {
     res.json({ success: true, message: "User deleted" });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 };
+
+export const updateCustomer = async (req, res) => {
+  try {
+    const { name, phone } = req.body;
+    if (
+      typeof name !== "string" ||
+      !name.trim() ||
+      typeof phone !== "string" ||
+      !phone.trim()
+    ) {
+      return res.status(400).json({ success: false, message: "Name and contact number are required." });
+    }
+
+    const user = await User.findOneAndUpdate(
+      { _id: req.params.id, role: "user", isActive: true },
+      { $set: { name: name.trim(), phone: phone.trim() } },
+      { new: true, runValidators: true }
+    );
+    if (!user) return res.status(404).json({ success: false, message: "Active customer not found." });
+    res.json({ success: true, data: user });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+};
+
+export const archiveCustomer = async (req, res) => {
+  try {
+    const user = await User.findOneAndUpdate(
+      { _id: req.params.id, role: "user", isActive: true },
+      { $set: { isActive: false } },
+      { new: true }
+    );
+    if (!user) return res.status(404).json({ success: false, message: "Active customer not found." });
+    res.json({ success: true, message: "Customer archived successfully." });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+};

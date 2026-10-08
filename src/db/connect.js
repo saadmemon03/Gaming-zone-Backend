@@ -18,7 +18,6 @@ if (dnsResultOrder && String(dnsResultOrder).trim()) {
 
 const connectDB = async () => {
   const mongoUri = process.env.MONGO_URI;
-console.log(mongoUri)
   if (!mongoUri) {
     throw new Error("MONGO_URI is not defined. Add it to gaming-api/.env");
   }

@@ -20,8 +20,6 @@ router.post("/verify-email", verifyEmail);
 router.post("/resend-verification-otp", resendVerificationOtpLimiter, resendVerificationOtp);
 router.post("/login", login);
 router.get("/me", authenticate, getMe);
-
-// Naye routes
 router.post("/forgot-password", forgotPassword);
 router.post("/reset-password", resetPassword);
 

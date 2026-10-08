@@ -20,7 +20,9 @@ const bookingSchema = new mongoose.Schema(
         quantity: Number,
       }
     ],
-    pointsEarned: { type: Number, default: 0 }
+    pointsEarned: { type: Number, default: 0 },
+    isDeleted: { type: Boolean, default: false },
+    isCustomerDeleted: { type: Boolean, default: false }
   },
   { timestamps: true }
 );

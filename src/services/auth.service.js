@@ -160,7 +160,7 @@ export const forgotPasswordService = async ({ email }) => {
   const htmlMessage = `
     <h3>Password Reset Request</h3>
     <p>Aapka password reset OTP ye hai: <strong>${otp}</strong></p>
-    <p>Ye OTP 10 minutes mein expire ho jayega.</p>
+    <p> Your OTP is expire in 15 minutes.</p>
   `;
 
   try {
@@ -194,7 +194,7 @@ export const resetPasswordService = async ({ email, otp, newPassword }) => {
   });
 
   if (!user) {
-    const error = new Error("Ghalat ya Expire shuda OTP");
+    const error = new Error("Your OTP is expire");
     error.status = 400;
     throw error;
   }
@@ -205,5 +205,5 @@ export const resetPasswordService = async ({ email, otp, newPassword }) => {
   
   await user.save();
 
-  return { message: "Password kamyabi se reset ho gaya. Ab aap login kar sakte hain." };
+  return { message: " Finally your password has been reset successfully. "  };
 };

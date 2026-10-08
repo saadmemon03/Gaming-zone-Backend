@@ -78,3 +78,53 @@ export const deleteBooking = async (req, res) => {
     res.json({ success: true, message: "Booking deleted" });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 };
+
+const getGuestCustomerFilter = ({ name, contact }) => ({
+  user: null,
+  guestName: name,
+  contactNumber: contact ?? null,
+  isCustomerDeleted: { $ne: true },
+});
+
+export const updateGuestCustomer = async (req, res) => {
+  try {
+    const { currentName, currentContact, name, contact } = req.body;
+    if (
+      typeof currentName !== "string" ||
+      typeof name !== "string" ||
+      typeof contact !== "string" ||
+      !name.trim()
+    ) {
+      return res.status(400).json({ success: false, message: "Customer name and contact number are required." });
+    }
+
+    const result = await Booking.updateMany(
+      getGuestCustomerFilter({ name: currentName, contact: currentContact }),
+      { $set: { guestName: name.trim(), contactNumber: contact.trim() } }
+    );
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ success: false, message: "Customer not found." });
+    }
+
+    res.json({ success: true, message: "Customer updated successfully." });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+};
+
+export const deleteGuestCustomer = async (req, res) => {
+  try {
+    const { name, contact } = req.body;
+    if (typeof name !== "string") {
+      return res.status(400).json({ success: false, message: "Customer name is required." });
+    }
+
+    const result = await Booking.updateMany(
+      getGuestCustomerFilter({ name, contact }),
+      { $set: { isCustomerDeleted: true } }
+    );
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ success: false, message: "Customer not found." });
+    }
+
+    res.json({ success: true, message: "Customer archived successfully." });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+};
