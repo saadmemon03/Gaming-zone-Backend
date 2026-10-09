@@ -11,7 +11,7 @@ const normalizeEmail = (email = "") => String(email).trim().toLowerCase();
 const sendVerificationOtp = async (user) => {
   const otp = crypto.randomInt(100000, 1000000).toString();
   user.verificationOTP = crypto.createHash("sha256").update(otp).digest("hex");
-  user.verificationOTPExpire = Date.now() + 10 * 60 * 1000;
+  user.verificationOTPExpire = Date.now() + 15 * 60 * 1000;
   await user.save();
 
   try {
@@ -21,7 +21,7 @@ const sendVerificationOtp = async (user) => {
       html: `
         <h3>Account Verification</h3>
         <p>Your verification OTP is: <strong>${otp}</strong></p>
-        <p>This code will expire in 10 minutes.</p>
+        <p>This code will expire in 15 minutes.</p>
       `,
     });
   } catch (err) {
@@ -153,13 +153,13 @@ export const forgotPasswordService = async ({ email }) => {
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
   
   user.resetPasswordToken = crypto.createHash("sha256").update(otp).digest("hex");
-  user.resetPasswordExpire = Date.now() + 1 * 60 * 1000; 
+  user.resetPasswordExpire = Date.now() + 15 * 60 * 1000; 
   
   await user.save({ validateBeforeSave: false });
 
   const htmlMessage = `
     <h3>Password Reset Request</h3>
-    <p>Aapka password reset OTP ye hai: <strong>${otp}</strong></p>
+    <p>Your reset password reset OTP is here: <strong>${otp}</strong></p>
     <p> Your OTP is expire in 15 minutes.</p>
   `;
 
@@ -169,7 +169,7 @@ export const forgotPasswordService = async ({ email }) => {
       subject: "Password Reset OTP - GameZone",
       html: htmlMessage,
     });
-    return { message: "OTP aapki email par bhej diya gaya hai" };
+    return { message: "Your OTP has been send to your email" };
   } catch (err) {
     user.resetPasswordToken = undefined;
     user.resetPasswordExpire = undefined;
@@ -205,5 +205,5 @@ export const resetPasswordService = async ({ email, otp, newPassword }) => {
   
   await user.save();
 
-  return { message: " Finally your password has been reset successfully. "  };
+  return { message: " Finally your password has been reset successfully."  };
 };

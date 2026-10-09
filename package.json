@@ -1,11 +1,12 @@
 {
-  "name": "gaming-api",
+  "name": "Backend",
   "version": "1.0.0",
   "type": "module",
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
     "admin:promote": "node scripts/admin/make-admin.js",
+    "test": "npm run test:unit",
     "test:unit": "node --test tests/booking-times.test.js tests/password-validation.test.js",
     "test:integration": "node --test tests/integration/auth.integration.test.js tests/integration/booking.integration.test.js"
   },
